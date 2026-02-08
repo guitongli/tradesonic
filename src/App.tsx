@@ -1,23 +1,58 @@
-import { useTone } from './hooks/useTone';
+import { useMemo } from 'react';
+import { usePolygon } from './hooks/usePolygon';
+import { TradeList } from './components/TradeList';
+import { StatusBadge } from './components/StatusBadge';
+
+const SYMBOLS = ['BTC-USD'];
 
 function App() {
-  const { isReady, startAudio, playNote } = useTone();
+  const symbols = useMemo(() => SYMBOLS, []);
+  const { trades, status, error, connect, disconnect } = usePolygon(symbols);
 
-  const handleClick = async () => {
-    await startAudio();
-    playNote(440);
-  };
+  const isConnected = status === 'connected';
+  const isConnecting = status === 'connecting' || status === 'authenticating';
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center gap-6">
-      <h1 className="text-4xl font-bold">TradeSonic</h1>
-      <p className="text-gray-400">Real-time trade sonification</p>
-      <button
-        onClick={handleClick}
-        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition-colors"
-      >
-        {isReady ? 'Play Test Tone' : 'Loading...'}
-      </button>
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-10 px-4 gap-6">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold">TradeSonic</h1>
+        <p className="text-gray-400 mt-1">Real-time BTC-USD trade stream</p>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <StatusBadge status={status} />
+
+        {!isConnected ? (
+          <button
+            onClick={connect}
+            disabled={isConnecting}
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed rounded-lg font-medium transition-colors text-sm"
+          >
+            {isConnecting ? 'Connecting...' : 'Connect'}
+          </button>
+        ) : (
+          <button
+            onClick={disconnect}
+            className="px-5 py-2 bg-red-600 hover:bg-red-500 rounded-lg font-medium transition-colors text-sm"
+          >
+            Disconnect
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-red-900/30 border border-red-800 rounded-lg px-4 py-2 text-red-300 text-sm max-w-lg">
+          {error}
+        </div>
+      )}
+
+      {isConnected && (
+        <p className="text-gray-500 text-xs">
+          {trades.length} trades received (showing latest 200)
+        </p>
+      )}
+
+      <TradeList trades={trades} />
     </div>
   );
 }
