@@ -7,11 +7,16 @@ import type { TradeData } from '../types';
 
 const MAX_TRADES = 200;
 
-export function useTradeStream(symbols: string[]) {
+export function useTradeStream(
+  symbols: string[],
+  onTrade?: (trade: TradeData) => void,
+) {
   const [trades, setTrades] = useState<TradeData[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<ReturnType<typeof createBinanceWebSocket> | null>(null);
+  const onTradeRef = useRef(onTrade);
+  onTradeRef.current = onTrade;
 
   const connect = useCallback(() => {
     wsRef.current?.disconnect();
@@ -21,6 +26,7 @@ export function useTradeStream(symbols: string[]) {
     wsRef.current = createBinanceWebSocket(symbols, {
       onTrade: (trade) => {
         setTrades((prev) => [trade, ...prev].slice(0, MAX_TRADES));
+        onTradeRef.current?.(trade);
       },
       onStatusChange: setStatus,
       onError: setError,

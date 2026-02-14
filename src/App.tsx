@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTradeStream } from './hooks/useTradeStream';
+import { useSonification } from './hooks/useSonification';
 import { TradeList } from './components/TradeList';
 import { StatusBadge } from './components/StatusBadge';
 
@@ -7,7 +8,11 @@ const SYMBOLS = ['btcusdt'];
 
 function App() {
   const symbols = useMemo(() => SYMBOLS, []);
-  const { trades, status, error, connect, disconnect } = useTradeStream(symbols);
+  const { enabled, toggleSound, sonifyTrade } = useSonification();
+  const { trades, status, error, connect, disconnect } = useTradeStream(
+    symbols,
+    sonifyTrade,
+  );
 
   const isConnected = status === 'connected';
   const isConnecting = status === 'connecting';
@@ -16,10 +21,10 @@ function App() {
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-10 px-4 gap-6">
       <div className="text-center">
         <h1 className="text-4xl font-bold">TradeSonic</h1>
-        <p className="text-gray-400 mt-1">Real-time BTC/USDT trade stream via Binance</p>
+        <p className="text-gray-400 mt-1">Real-time BTC/USDT trade sonification</p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <StatusBadge status={status} />
 
         {!isConnected ? (
@@ -38,6 +43,17 @@ function App() {
             Disconnect
           </button>
         )}
+
+        <button
+          onClick={toggleSound}
+          className={`px-5 py-2 rounded-lg font-medium transition-colors text-sm ${
+            enabled
+              ? 'bg-amber-600 hover:bg-amber-500'
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+        >
+          {enabled ? 'Sound ON' : 'Sound OFF'}
+        </button>
       </div>
 
       {error && (
