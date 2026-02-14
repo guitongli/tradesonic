@@ -1,22 +1,22 @@
 import { useMemo } from 'react';
-import { usePolygon } from './hooks/usePolygon';
+import { useTradeStream } from './hooks/useTradeStream';
 import { TradeList } from './components/TradeList';
 import { StatusBadge } from './components/StatusBadge';
 
-const SYMBOLS = ['BTC-USD'];
+const SYMBOLS = ['btcusdt'];
 
 function App() {
   const symbols = useMemo(() => SYMBOLS, []);
-  const { trades, status, error, connect, disconnect } = usePolygon(symbols);
+  const { trades, status, error, connect, disconnect } = useTradeStream(symbols);
 
   const isConnected = status === 'connected';
-  const isConnecting = status === 'connecting' || status === 'authenticating';
+  const isConnecting = status === 'connecting';
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-10 px-4 gap-6">
       <div className="text-center">
         <h1 className="text-4xl font-bold">TradeSonic</h1>
-        <p className="text-gray-400 mt-1">Real-time BTC-USD trade stream</p>
+        <p className="text-gray-400 mt-1">Real-time BTC/USDT trade stream via Binance</p>
       </div>
 
       <div className="flex items-center gap-4">

@@ -4,8 +4,7 @@ export interface TradeData {
   price: number;
   size: number;
   timestamp: number;
-  exchange: number;
-  conditions: number[];
+  isBuyerMaker: boolean;
 }
 
 export interface SonificationConfig {
@@ -15,23 +14,14 @@ export interface SonificationConfig {
   enabled: boolean;
 }
 
-/** Raw Polygon.io crypto trade WebSocket message */
-export interface PolygonCryptoTrade {
-  ev: 'XT';
-  pair: string;
-  p: number;
-  s: number;
+/** Raw Binance trade WebSocket message */
+export interface BinanceTrade {
+  e: 'trade';
+  E: number;
+  s: string;
   t: number;
-  x: number;
-  c: number[];
-  i: string;
-  r: number;
+  p: string;
+  q: string;
+  T: number;
+  m: boolean;
 }
-
-export interface PolygonStatusMessage {
-  ev: 'status';
-  status: string;
-  message: string;
-}
-
-export type PolygonMessage = PolygonCryptoTrade | PolygonStatusMessage;

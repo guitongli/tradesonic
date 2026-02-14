@@ -1,9 +1,8 @@
-import type { ConnectionStatus } from '../services/polygonWebSocket';
+import type { ConnectionStatus } from '../services/binanceWebSocket';
 
 const statusConfig: Record<ConnectionStatus, { label: string; color: string }> = {
   disconnected: { label: 'Disconnected', color: 'bg-gray-500' },
   connecting: { label: 'Connecting...', color: 'bg-yellow-500' },
-  authenticating: { label: 'Authenticating...', color: 'bg-yellow-500' },
   connected: { label: 'Live', color: 'bg-emerald-500' },
   error: { label: 'Error', color: 'bg-red-500' },
 };

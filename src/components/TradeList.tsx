@@ -48,11 +48,11 @@ export function TradeList({ trades }: TradeListProps) {
               {formatTime(trade.timestamp)}
             </span>
             <span className="text-white font-medium">{trade.pair}</span>
-            <span className="text-right font-mono text-emerald-400">
+            <span className={`text-right font-mono ${trade.isBuyerMaker ? 'text-red-400' : 'text-emerald-400'}`}>
               ${formatPrice(trade.price)}
             </span>
             <span className="text-right font-mono text-gray-300">
-              {trade.size.toFixed(8)}
+              {trade.size.toFixed(6)}
             </span>
           </div>
         ))}
