@@ -14,8 +14,12 @@ export function usePolygon(symbols: string[]) {
   const wsRef = useRef<ReturnType<typeof createPolygonWebSocket> | null>(null);
 
   const connect = useCallback(() => {
-    const apiKey = import.meta.env.VITE_POLYGON_API_KEY as string | undefined;
-    console.log('VITE_POLYGON_API_KEY loaded:', apiKey ? `${apiKey.slice(0, 4)}...` : 'EMPTY');
+    const envKey = import.meta.env.VITE_POLYGON_API_KEY as string | undefined;
+    const apiKey = envKey?.trim() || '';
+    console.log('VITE_POLYGON_API_KEY loaded:', apiKey ? `"${apiKey.slice(0, 4)}..." (len=${apiKey.length})` : 'EMPTY');
+    console.log('All VITE_ env vars:', JSON.stringify(
+      Object.fromEntries(Object.entries(import.meta.env).filter(([k]) => k.startsWith('VITE_')))
+    ));
     if (!apiKey || apiKey === 'your_polygon_api_key_here') {
       setError('Set VITE_POLYGON_API_KEY in your .env file. Make sure .env is in the project root (next to package.json) and restart the dev server.');
       setStatus('error');
