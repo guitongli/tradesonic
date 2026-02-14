@@ -29,7 +29,7 @@ export function useSonification() {
   const sonifyTrade = useCallback(
     (trade: TradeData) => {
       if (enabled && engineRef.current) {
-        engineRef.current.playTrade(trade);
+        engineRef.current.feedTrade(trade);
       }
     },
     [enabled],

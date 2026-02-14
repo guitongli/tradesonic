@@ -4,7 +4,6 @@ import type { TradeData } from '../types';
 // Mixolydian scale intervals (semitones from root): 1 2 3 4 5 6 b7
 const MIXOLYDIAN_INTERVALS = [0, 2, 4, 5, 7, 9, 10];
 
-// Build a Mixolydian scale across multiple octaves as MIDI note numbers
 function buildScale(rootMidi: number, octaves: number): number[] {
   const notes: number[] = [];
   for (let oct = 0; oct < octaves; oct++) {
@@ -15,105 +14,170 @@ function buildScale(rootMidi: number, octaves: number): number[] {
   return notes;
 }
 
-// C3 = MIDI 48, spanning 4 octaves gives a nice range
-const SCALE = buildScale(48, 4); // C3 Mixolydian up to C6
+// C3 Mixolydian across 3 octaves for pads, higher range would be too bright
+const SCALE = buildScale(48, 3); // C3–C5
+
+// Whale trade threshold in BTC
+const WHALE_THRESHOLD = 0.1;
 
 export interface SonificationEngine {
   start: () => Promise<void>;
-  playTrade: (trade: TradeData) => void;
+  feedTrade: (trade: TradeData) => void;
   setVolume: (db: number) => void;
   dispose: () => void;
 }
 
 export function createSonificationEngine(): SonificationEngine {
-  // --- Signal chain: PolySynth -> Reverb -> Destination ---
-  const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.35 }).toDestination();
-
-  // Main melodic voice — warm FM synth
-  const melodySynth = new Tone.PolySynth(Tone.FMSynth, {
-    modulationIndex: 2,
-    envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.8 },
-    modulation: { type: 'sine' },
-    oscillator: { type: 'sine' },
-    volume: -6,
+  // ─── Effects chain ───
+  const reverb = new Tone.Reverb({ decay: 6, wet: 0.6 }).toDestination();
+  const delay = new Tone.FeedbackDelay({
+    delayTime: '4n',
+    feedback: 0.3,
+    wet: 0.25,
   }).connect(reverb);
-  melodySynth.maxPolyphony = 8;
 
-  // Harmony pad — softer, sustained
+  // ─── Ambient pad: slow-attack sine pad for the 1/sec pulse ───
+  const padSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 1.2, decay: 2.0, sustain: 0.4, release: 3.0 },
+    volume: -10,
+  }).connect(delay);
+  padSynth.maxPolyphony = 12;
+
+  // ─── Harmony layer: triangle wave, slightly offset timing ───
   const harmonySynth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
-    envelope: { attack: 0.05, decay: 0.4, sustain: 0.3, release: 1.2 },
-    volume: -14,
+    envelope: { attack: 1.5, decay: 2.5, sustain: 0.3, release: 4.0 },
+    volume: -18,
   }).connect(reverb);
   harmonySynth.maxPolyphony = 8;
+
+  // ─── Drone: low sustained bass that shifts with trend ───
+  const droneSynth = new Tone.Synth({
+    oscillator: { type: 'sine' },
+    envelope: { attack: 3, decay: 1, sustain: 1, release: 4 },
+    volume: -16,
+  }).connect(reverb);
+
+  // ─── Whale bell: metallic singing-bowl sound for large trades ───
+  const whaleSynth = new Tone.MetalSynth({
+    envelope: { attack: 0.01, decay: 4, release: 3 },
+    harmonicity: 3.1,
+    modulationIndex: 16,
+    resonance: 2000,
+    octaves: 1.5,
+    volume: -14,
+  }).connect(delay);
+
+  // ─── Trade aggregation state ───
+  let tradeBuffer: TradeData[] = [];
+  let pulseInterval: ReturnType<typeof setInterval> | null = null;
+  let currentDroneNote: number | null = null;
 
   // Price tracking for relative mapping
   let priceMin = Infinity;
   let priceMax = -Infinity;
 
   function priceToScaleIndex(price: number): number {
-    // Expand the observed range
     priceMin = Math.min(priceMin, price);
     priceMax = Math.max(priceMax, price);
-
-    // Need some range to map — if prices are very close, use a $100 window
     const range = Math.max(priceMax - priceMin, 100);
-    const normalized = (price - priceMin) / range; // 0..1
+    const normalized = (price - priceMin) / range;
     const clamped = Math.max(0, Math.min(1, normalized));
-
     return Math.round(clamped * (SCALE.length - 1));
   }
 
-  function sizeToDuration(size: number): string {
-    // Larger trades → longer notes
-    if (size >= 1) return '2n';     // whale trade
-    if (size >= 0.1) return '4n';   // large
-    if (size >= 0.01) return '8n';  // medium
-    if (size >= 0.001) return '16n'; // small
-    return '32n';                    // micro
+  function getTriad(scaleIndex: number): number[] {
+    const root = SCALE[scaleIndex];
+    const third = SCALE[Math.min(scaleIndex + 2, SCALE.length - 1)];
+    const fifth = SCALE[Math.min(scaleIndex + 4, SCALE.length - 1)];
+    return [root, third, fifth];
   }
 
-  function getHarmonyNotes(scaleIndex: number): number[] {
-    // Build a triad from the Mixolydian scale: third (2 steps up) + fifth (4 steps up)
-    const thirdIdx = Math.min(scaleIndex + 2, SCALE.length - 1);
-    const fifthIdx = Math.min(scaleIndex + 4, SCALE.length - 1);
-    return [SCALE[thirdIdx], SCALE[fifthIdx]];
+  function midiToFreq(midi: number): number {
+    return Tone.Frequency(midi, 'midi').toFrequency();
   }
 
-  async function start() {
-    await Tone.start();
-  }
-
-  function playTrade(trade: TradeData) {
+  // ─── Ambient pulse: called every ~1.5 seconds ───
+  function playAmbientPulse() {
     if (Tone.getContext().state !== 'running') return;
+    if (tradeBuffer.length === 0) return;
 
-    const scaleIndex = priceToScaleIndex(trade.price);
-    const rootMidi = SCALE[scaleIndex];
-    const duration = sizeToDuration(trade.size);
+    // Aggregate: average price, total volume
+    const avgPrice =
+      tradeBuffer.reduce((sum, t) => sum + t.price, 0) / tradeBuffer.length;
+    const tradeCount = tradeBuffer.length;
+    tradeBuffer = [];
+
+    const scaleIndex = priceToScaleIndex(avgPrice);
+    const triad = getTriad(scaleIndex);
     const now = Tone.now();
 
-    // Root melody note
-    const rootFreq = Tone.Frequency(rootMidi, 'midi').toFrequency();
-    melodySynth.triggerAttackRelease(rootFreq, duration, now);
+    // Pad chord — duration scales with activity (more trades = fuller sound)
+    const duration = tradeCount > 50 ? '2n' : tradeCount > 10 ? '1n' : '2n.';
+    const padFreqs = triad.map(midiToFreq);
+    padSynth.triggerAttackRelease(padFreqs, duration, now);
 
-    // Harmony notes (third + fifth in the Mixolydian scale)
-    const harmonyMidis = getHarmonyNotes(scaleIndex);
-    const harmonyFreqs = harmonyMidis.map((m) =>
-      Tone.Frequency(m, 'midi').toFrequency(),
-    );
-    harmonySynth.triggerAttackRelease(harmonyFreqs, duration, now + 0.02);
+    // Harmony — just the third and fifth, offset slightly
+    const harmonyFreqs = [triad[1], triad[2]].map(midiToFreq);
+    harmonySynth.triggerAttackRelease(harmonyFreqs, duration, now + 0.3);
+
+    // Update drone — shift the bass note slowly to follow the average price
+    const droneNote = SCALE[Math.min(scaleIndex, 6)]; // keep in low octave
+    const droneFreq = midiToFreq(droneNote - 12); // one octave below the scale
+    if (currentDroneNote !== droneNote) {
+      currentDroneNote = droneNote;
+      droneSynth.triggerAttackRelease(droneFreq, '2m', now + 0.1);
+    }
+  }
+
+  // ─── Whale alert: immediate singing-bowl hit ───
+  function playWhaleAlert(trade: TradeData) {
+    if (Tone.getContext().state !== 'running') return;
+    const now = Tone.now();
+    // Higher pitch for bigger trades, range 200-800 Hz
+    const freq = Math.min(200 + trade.size * 100, 800);
+    whaleSynth.triggerAttackRelease(freq, '4n', now);
+  }
+
+  // ─── Public API ───
+  async function start() {
+    await Tone.start();
+    Tone.getTransport().bpm.value = 60;
+    // Start the ambient pulse loop
+    if (!pulseInterval) {
+      pulseInterval = setInterval(playAmbientPulse, 1500);
+    }
+  }
+
+  function feedTrade(trade: TradeData) {
+    tradeBuffer.push(trade);
+
+    // Whale trades get an immediate alert
+    if (trade.size >= WHALE_THRESHOLD) {
+      playWhaleAlert(trade);
+    }
   }
 
   function setVolume(db: number) {
-    melodySynth.volume.value = db;
-    harmonySynth.volume.value = db - 8; // harmony stays quieter
+    padSynth.volume.value = db;
+    harmonySynth.volume.value = db - 8;
+    droneSynth.volume.value = db - 6;
+    whaleSynth.volume.value = db - 4;
   }
 
   function dispose() {
-    melodySynth.dispose();
+    if (pulseInterval) {
+      clearInterval(pulseInterval);
+      pulseInterval = null;
+    }
+    padSynth.dispose();
     harmonySynth.dispose();
+    droneSynth.dispose();
+    whaleSynth.dispose();
+    delay.dispose();
     reverb.dispose();
   }
 
-  return { start, playTrade, setVolume, dispose };
+  return { start, feedTrade, setVolume, dispose };
 }
