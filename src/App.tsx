@@ -1,19 +1,14 @@
 import { useMemo } from 'react';
 import { useTradeStream } from './hooks/useTradeStream';
-import { useSonification, type SoundMode } from './hooks/useSonification';
+import { useSonification } from './hooks/useSonification';
 import { TradeList } from './components/TradeList';
 import { StatusBadge } from './components/StatusBadge';
 
 const SYMBOLS = ['btcusdt'];
 
-const MODE_LABELS: Record<SoundMode, { label: string; desc: string }> = {
-  glitch: { label: 'Glitch', desc: 'Alva Noto style — kicks & beeps per trade' },
-  ambient: { label: 'Ambient', desc: 'Meditative pads — aggregated every 1.5s' },
-};
-
 function App() {
   const symbols = useMemo(() => SYMBOLS, []);
-  const { enabled, mode, toggleSound, switchMode, sonifyTrade } =
+  const { ambientOn, glitchOn, toggleAmbient, toggleGlitch, sonifyTrade } =
     useSonification();
   const { trades, status, error, connect, disconnect } = useTradeStream(
     symbols,
@@ -30,7 +25,7 @@ function App() {
         <p className="text-gray-400 mt-1">Real-time BTC/USDT trade sonification</p>
       </div>
 
-      {/* Connection + Sound controls */}
+      {/* Connection controls */}
       <div className="flex items-center gap-3">
         <StatusBadge status={status} />
 
@@ -50,36 +45,31 @@ function App() {
             Disconnect
           </button>
         )}
+      </div>
 
+      {/* Sound mode toggles */}
+      <div className="flex items-center gap-3">
         <button
-          onClick={toggleSound}
+          onClick={toggleAmbient}
           className={`px-5 py-2 rounded-lg font-medium transition-colors text-sm ${
-            enabled
+            ambientOn
               ? 'bg-amber-600 hover:bg-amber-500'
               : 'bg-gray-700 hover:bg-gray-600'
           }`}
         >
-          {enabled ? 'Sound ON' : 'Sound OFF'}
+          {ambientOn ? 'Ambient ON' : 'Ambient OFF'}
         </button>
-      </div>
 
-      {/* Mode switcher */}
-      <div className="flex items-center gap-2">
-        {(Object.keys(MODE_LABELS) as SoundMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => switchMode(m)}
-            title={MODE_LABELS[m].desc}
-            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              mode === m
-                ? 'bg-white/10 text-white border border-white/20'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {MODE_LABELS[m].label}
-          </button>
-        ))}
-        <span className="text-gray-600 text-xs ml-2">{MODE_LABELS[mode].desc}</span>
+        <button
+          onClick={toggleGlitch}
+          className={`px-5 py-2 rounded-lg font-medium transition-colors text-sm ${
+            glitchOn
+              ? 'bg-violet-600 hover:bg-violet-500'
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+        >
+          {glitchOn ? 'Glitch ON' : 'Glitch OFF'}
+        </button>
       </div>
 
       {error && (

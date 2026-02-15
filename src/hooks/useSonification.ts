@@ -9,57 +9,56 @@ import {
 } from '../services/glitchSonification';
 import type { TradeData } from '../types';
 
-export type SoundMode = 'ambient' | 'glitch';
-
-type Engine = SonificationEngine | GlitchEngine;
-
 export function useSonification() {
-  const [enabled, setEnabled] = useState(false);
-  const [mode, setMode] = useState<SoundMode>('glitch');
+  const [ambientOn, setAmbientOn] = useState(false);
+  const [glitchOn, setGlitchOn] = useState(false);
   const [audioStarted, setAudioStarted] = useState(false);
-  const engineRef = useRef<Engine | null>(null);
 
-  // Create/swap engine when mode changes
+  const ambientRef = useRef<SonificationEngine | null>(null);
+  const glitchRef = useRef<GlitchEngine | null>(null);
+
+  // Create both engines on mount
   useEffect(() => {
-    engineRef.current?.dispose();
-    engineRef.current =
-      mode === 'ambient' ? createSonificationEngine() : createGlitchEngine();
-
-    // If audio was already started, re-start the new engine
-    if (audioStarted) {
-      engineRef.current.start();
-    }
+    ambientRef.current = createSonificationEngine();
+    glitchRef.current = createGlitchEngine();
 
     return () => {
-      engineRef.current?.dispose();
-      engineRef.current = null;
+      ambientRef.current?.dispose();
+      glitchRef.current?.dispose();
+      ambientRef.current = null;
+      glitchRef.current = null;
     };
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  const toggleSound = useCallback(async () => {
-    if (!audioStarted && engineRef.current) {
-      await engineRef.current.start();
+  const ensureAudioStarted = useCallback(async () => {
+    if (!audioStarted) {
+      await ambientRef.current?.start();
+      await glitchRef.current?.start();
       setAudioStarted(true);
     }
-    setEnabled((prev) => !prev);
   }, [audioStarted]);
 
-  const switchMode = useCallback((newMode: SoundMode) => {
-    setMode(newMode);
-  }, []);
+  const toggleAmbient = useCallback(async () => {
+    await ensureAudioStarted();
+    setAmbientOn((prev) => !prev);
+  }, [ensureAudioStarted]);
+
+  const toggleGlitch = useCallback(async () => {
+    await ensureAudioStarted();
+    setGlitchOn((prev) => !prev);
+  }, [ensureAudioStarted]);
 
   const sonifyTrade = useCallback(
     (trade: TradeData) => {
-      if (enabled && engineRef.current) {
-        engineRef.current.feedTrade(trade);
+      if (ambientOn && ambientRef.current) {
+        ambientRef.current.feedTrade(trade);
+      }
+      if (glitchOn && glitchRef.current) {
+        glitchRef.current.feedTrade(trade);
       }
     },
-    [enabled],
+    [ambientOn, glitchOn],
   );
 
-  const setVolume = useCallback((db: number) => {
-    engineRef.current?.setVolume(db);
-  }, []);
-
-  return { enabled, mode, toggleSound, switchMode, sonifyTrade, setVolume };
+  return { ambientOn, glitchOn, toggleAmbient, toggleGlitch, sonifyTrade };
 }
