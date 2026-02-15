@@ -12,6 +12,8 @@ import type { TradeData } from '../types';
 export function useSonification() {
   const [ambientOn, setAmbientOn] = useState(false);
   const [glitchOn, setGlitchOn] = useState(false);
+  const [ambientVol, setAmbientVol] = useState(-10);
+  const [glitchVol, setGlitchVol] = useState(-8);
   const [audioStarted, setAudioStarted] = useState(false);
 
   const ambientRef = useRef<SonificationEngine | null>(null);
@@ -48,6 +50,16 @@ export function useSonification() {
     setGlitchOn((prev) => !prev);
   }, [ensureAudioStarted]);
 
+  const setAmbientVolume = useCallback((db: number) => {
+    setAmbientVol(db);
+    ambientRef.current?.setVolume(db);
+  }, []);
+
+  const setGlitchVolume = useCallback((db: number) => {
+    setGlitchVol(db);
+    glitchRef.current?.setVolume(db);
+  }, []);
+
   const sonifyTrade = useCallback(
     (trade: TradeData) => {
       if (ambientOn && ambientRef.current) {
@@ -60,5 +72,15 @@ export function useSonification() {
     [ambientOn, glitchOn],
   );
 
-  return { ambientOn, glitchOn, toggleAmbient, toggleGlitch, sonifyTrade };
+  return {
+    ambientOn,
+    glitchOn,
+    ambientVol,
+    glitchVol,
+    toggleAmbient,
+    toggleGlitch,
+    setAmbientVolume,
+    setGlitchVolume,
+    sonifyTrade,
+  };
 }

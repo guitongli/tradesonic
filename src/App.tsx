@@ -3,13 +3,23 @@ import { useTradeStream } from './hooks/useTradeStream';
 import { useSonification } from './hooks/useSonification';
 import { TradeList } from './components/TradeList';
 import { StatusBadge } from './components/StatusBadge';
+import { VolumeSlider } from './components/VolumeSlider';
 
 const SYMBOLS = ['btcusdt'];
 
 function App() {
   const symbols = useMemo(() => SYMBOLS, []);
-  const { ambientOn, glitchOn, toggleAmbient, toggleGlitch, sonifyTrade } =
-    useSonification();
+  const {
+    ambientOn,
+    glitchOn,
+    ambientVol,
+    glitchVol,
+    toggleAmbient,
+    toggleGlitch,
+    setAmbientVolume,
+    setGlitchVolume,
+    sonifyTrade,
+  } = useSonification();
   const { trades, status, error, connect, disconnect } = useTradeStream(
     symbols,
     sonifyTrade,
@@ -47,29 +57,45 @@ function App() {
         )}
       </div>
 
-      {/* Sound mode toggles */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={toggleAmbient}
-          className={`px-5 py-2 rounded-lg font-medium transition-colors text-sm ${
-            ambientOn
-              ? 'bg-amber-600 hover:bg-amber-500'
-              : 'bg-gray-700 hover:bg-gray-600'
-          }`}
-        >
-          {ambientOn ? 'Ambient ON' : 'Ambient OFF'}
-        </button>
+      {/* Sound mixer */}
+      <div className="w-full max-w-md flex flex-col gap-3 bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleAmbient}
+            className={`px-4 py-1.5 rounded-lg font-medium transition-colors text-sm shrink-0 ${
+              ambientOn
+                ? 'bg-amber-600 hover:bg-amber-500'
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          >
+            {ambientOn ? 'Ambient ON' : 'Ambient OFF'}
+          </button>
+          <VolumeSlider
+            label=""
+            value={ambientVol}
+            onChange={setAmbientVolume}
+            accentColor="#d97706"
+          />
+        </div>
 
-        <button
-          onClick={toggleGlitch}
-          className={`px-5 py-2 rounded-lg font-medium transition-colors text-sm ${
-            glitchOn
-              ? 'bg-violet-600 hover:bg-violet-500'
-              : 'bg-gray-700 hover:bg-gray-600'
-          }`}
-        >
-          {glitchOn ? 'Glitch ON' : 'Glitch OFF'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleGlitch}
+            className={`px-4 py-1.5 rounded-lg font-medium transition-colors text-sm shrink-0 ${
+              glitchOn
+                ? 'bg-violet-600 hover:bg-violet-500'
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          >
+            {glitchOn ? 'Glitch ON' : 'Glitch OFF'}
+          </button>
+          <VolumeSlider
+            label=""
+            value={glitchVol}
+            onChange={setGlitchVolume}
+            accentColor="#7c3aed"
+          />
+        </div>
       </div>
 
       {error && (
