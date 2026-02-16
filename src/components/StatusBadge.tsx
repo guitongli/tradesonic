@@ -1,4 +1,4 @@
-import type { ConnectionStatus } from '../services/binanceWebSocket';
+import type { ConnectionStatus } from '../types';
 
 const statusConfig: Record<ConnectionStatus, { label: string; color: string }> = {
   disconnected: { label: 'Disconnected', color: 'bg-gray-500' },
